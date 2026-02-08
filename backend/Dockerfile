@@ -4,7 +4,7 @@ FROM python:3.12-slim AS base
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential curl && \
+    apt-get install -y --no-install-recommends build-essential curl ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

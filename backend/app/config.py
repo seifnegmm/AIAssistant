@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # Telegram Bot
     telegram_bot_token: str = ""
     telegram_user_id: str = ""
+    telegram_whitelist: str = ""  # Comma-separated user IDs (e.g., "123456,789012")
 
     # MongoDB
     mongodb_uri: str = "mongodb://mongodb:27017"
@@ -54,6 +55,15 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.environment == "development"
+
+    @property
+    def telegram_allowed_users(self) -> list[str]:
+        """Get list of allowed Telegram user IDs from whitelist."""
+        if not self.telegram_whitelist:
+            return []
+        return [
+            uid.strip() for uid in self.telegram_whitelist.split(",") if uid.strip()
+        ]
 
 
 settings = Settings()
