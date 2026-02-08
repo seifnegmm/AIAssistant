@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.chat import websocket_chat
 from app.api.router import api_router
 from app.config import settings
-from app.dependencies import get_memory_manager
+from app.dependencies import get_memory_manager, get_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await memory_manager.initialize()
     logger.info("Memory manager initialized successfully")
 
+    # Initialize scheduler (for scheduled Telegram messages)
+    scheduler = get_scheduler()
+    await scheduler.initialize()
+    logger.info("Scheduler initialized successfully")
+
     yield
 
     # Cleanup
+    await scheduler.shutdown()
     await memory_manager.close()
     logger.info("AI Assistant backend shut down cleanly")
 

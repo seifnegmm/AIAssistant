@@ -190,8 +190,23 @@ class HopeTelegramBot:
             ):
                 full_response += token
 
+            # Fallback for tool-only responses (e.g., scheduling, memory ops)
+            if not full_response:
+                logger.warning("Empty stream response, falling back to agent.chat()")
+                full_response = await self.agent.chat(
+                    message_text, session_id, language=language
+                )
+
             # Send response back to Telegram
-            await update.message.reply_text(full_response)
+            if full_response:
+                await update.message.reply_text(full_response)
+            else:
+                logger.error("No response from agent, sending error message")
+                await update.message.reply_text(
+                    "Sorry, I encountered an issue processing your request."
+                    if language == "en"
+                    else "عذراً، حصل خطأ في معالجة طلبك."
+                )
             logger.info(f"Sent response to user {user_id}: {full_response[:50]}...")
 
         except Exception as e:

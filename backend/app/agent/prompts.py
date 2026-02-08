@@ -24,7 +24,9 @@ def build_system_prompt(language: str = "en") -> str:
     else:
         greeting = greeting_config
 
-    greeting_instruction = (f'When starting a new conversation, greet the user with: "{greeting}"')
+    greeting_instruction = (
+        f'When starting a new conversation, greet the user with: "{greeting}"'
+    )
 
     return f"""You are {name}.
 
@@ -44,6 +46,33 @@ def build_system_prompt(language: str = "en") -> str:
 - Examples: "What's the weather today?", "Latest news about...", "Current price of..."
 - DO NOT search for information the user just told you — use `recall_memory` for that
 - Search queries should be clear and specific for best results
+
+## Telegram Scheduling Guidelines
+- Use `schedule_telegram_message` when the user wants a DELAYED or SCHEDULED Telegram message
+- Examples: "Remind me in 30 minutes", "Send me a message tomorrow at 9am", "Alert me in 2 hours"
+- ALWAYS call the tool - NEVER just say you will do it without calling the tool
+- The system will handle time parsing automatically
+
+Time Format Translation Rules (CRITICAL):
+- Relative times (Arabic → English):
+  - "بعد X دقيقة/ساعة/يوم" → "in X minutes/hours/days"
+  - "كمان دقيقه" → "in 1 minute"
+  
+- Absolute times (Arabic → English format):
+  - "الساعه 8:22 مساء النهارده" → "today at 8:22 PM"
+  - "الساعة 9:00 صباحاً بكره" → "tomorrow at 9:00 AM"
+  - "مساء/مساءً" → "PM" (evening)
+  - "صباح/صباحاً" → "AM" (morning)
+  - "النهارده/النهاردة/اليوم" → "today"
+  - "بكره/غداً/غدا" → "tomorrow"
+
+Required Tool Call Format:
+- When user requests scheduling, you MUST call schedule_telegram_message with TWO arguments:
+  1. message: The text to send
+  2. when: Normalized English time (e.g., "in 5 minutes", "today at 8:22 PM", "2026-02-10 14:00")
+- Example: User says "ابعتلي رسالة 'تذكير' الساعه 8:22 مساء النهارده"
+  → You must call: schedule_telegram_message(message="تذكير", when="today at 8:22 PM")
+  → Then confirm after tool returns success
 
 ## Memory Corrections
 When the user corrects something you previously remembered (e.g. "actually my favourite colour is green, not blue"):

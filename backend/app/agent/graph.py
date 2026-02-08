@@ -34,11 +34,11 @@ class AssistantAgent:
     def __init__(self, memory_manager: MemoryManager) -> None:
         self._memory_manager = memory_manager
 
-        # Build LLM
+        # Build LLM (low temperature for deterministic tool calls)
         self._llm = ChatGoogleGenerativeAI(
             model=settings.gemini_model,
             google_api_key=settings.google_api_key,
-            temperature=0.7,
+            temperature=0.2,
             streaming=True,
         )
 

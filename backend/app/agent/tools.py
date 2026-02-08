@@ -40,9 +40,10 @@ def build_tools(memory_manager: MemoryManager) -> list:
     else:
         logger.warning("TAVILY_API_KEY not set - web search tool disabled")
 
-    # Add Telegram messaging tool only if bot token is configured
+    # Add Telegram messaging tools only if bot token is configured
     if settings.telegram_bot_token and settings.telegram_user_id:
         tools.append(send_telegram_message)
+        tools.append(schedule_telegram_message)
     else:
         logger.warning(
             "TELEGRAM_BOT_TOKEN or TELEGRAM_USER_ID not set - Telegram messaging disabled"
@@ -359,3 +360,65 @@ def send_telegram_message(message: str) -> str:
     except Exception as e:
         logger.exception("send_telegram_message failed")
         return f"Unexpected error sending Telegram message: {str(e)}"
+
+
+@tool
+def schedule_telegram_message(message: str, when: str) -> str:
+    """Schedule a message to be sent to the user on Telegram at a specific time.
+
+    Use this tool when the user wants a DELAYED or SCHEDULED message:
+    - "Remind me in 30 minutes..."
+    - "Text me tomorrow at 9am..."
+    - "Send me a message at 5pm..."
+    - "Alert me in 2 hours if..."
+
+    Time expressions supported:
+    - Relative: "in 30 minutes", "in 2 hours", "in 1 day"
+    - Today: "5pm", "17:00", "at 3:30pm"
+    - Tomorrow: "tomorrow at 9am", "tomorrow 14:00"
+    - Absolute: "2026-02-10 14:00"
+
+    Args:
+        message: The text message to send. Keep it concise and clear.
+        when: Natural language time expression (e.g., "in 30 minutes", "tomorrow at 9am").
+
+    Returns:
+        Confirmation with the scheduled time or an error message.
+    """
+    if not settings.telegram_bot_token or not settings.telegram_user_id:
+        return "Telegram scheduling is not configured."
+
+    logger.info(
+        f"🔧 schedule_telegram_message called with: message='{message}', when='{when}'"
+    )
+
+    try:
+        from app.dependencies import get_scheduler
+
+        # Get scheduler instance
+        scheduler = get_scheduler()
+
+        # Schedule the message
+        result = _run_async(
+            scheduler.schedule_telegram_message(
+                user_id=settings.telegram_user_id, message=message, when=when
+            )
+        )
+
+        formatted_time = result["formatted_time"]
+        job_id = result["job_id"]
+
+        logger.info(
+            f"Scheduled Telegram message for {formatted_time} (job_id: {job_id})"
+        )
+
+        return f"✓ Scheduled! I'll send you a message {formatted_time}."
+
+    except ValueError as e:
+        # Time parsing error
+        logger.warning(f"schedule_telegram_message: invalid time '{when}': {e}")
+        return f"Sorry, I couldn't understand the time '{when}'. Try: 'in 30 minutes', 'tomorrow at 9am', '5pm', etc."
+
+    except Exception as e:
+        logger.exception("schedule_telegram_message failed")
+        return f"Failed to schedule message: {str(e)}"
