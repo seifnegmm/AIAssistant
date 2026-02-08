@@ -49,11 +49,12 @@ class TextToSpeech:
             self._client = None
         logger.info("TextToSpeech closed")
 
-    async def synthesize(self, text: str) -> bytes:
-        """Synthesize text to raw PCM16 audio.
+    async def synthesize(self, text: str, language: str = "en") -> bytes:
+        """Synthesize text to raw PCM16 audio with language support.
 
         Args:
             text: Text to convert to speech.
+            language: Language code ("en" or "ar"). Defaults to "en".
 
         Returns:
             Raw PCM16 audio bytes (16kHz, mono, 16-bit signed LE).
@@ -65,11 +66,19 @@ class TextToSpeech:
         if not text or not text.strip():
             return b""
 
+        # Select voice and language code based on detected language
+        if language == "ar":
+            language_code = "ar-XA"
+            voice_name = settings.tts_voice_ar
+        else:
+            language_code = "en-US"
+            voice_name = self._voice_name
+
         request_body = {
             "input": {"text": text},
             "voice": {
-                "languageCode": "en-US",
-                "name": self._voice_name,
+                "languageCode": language_code,
+                "name": voice_name,
             },
             "audioConfig": {
                 "audioEncoding": "LINEAR16",
@@ -119,7 +128,7 @@ class TextToSpeech:
             raise
 
     async def synthesize_chunked(
-        self, text: str, max_chars: int = 200
+        self, text: str, language: str = "en", max_chars: int = 200
     ) -> AsyncIterator[bytes]:
         """Synthesize long text in chunks for streaming playback.
 
@@ -128,6 +137,7 @@ class TextToSpeech:
 
         Args:
             text: Full text to synthesize.
+            language: Language code ("en" or "ar"). Defaults to "en".
             max_chars: Maximum characters per chunk.
 
         Yields:
@@ -136,7 +146,7 @@ class TextToSpeech:
         chunks = self._split_text(text, max_chars)
 
         for chunk in chunks:
-            audio = await self.synthesize(chunk)
+            audio = await self.synthesize(chunk, language=language)
             if audio:
                 yield audio
 

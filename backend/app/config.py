@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # Voice
     tts_voice: str = "en-US-Chirp3-HD-Leda"
+    tts_voice_ar: str = "ar-XA-Chirp3-HD-Leda"
     audio_sample_rate: int = 16000
 
     # Simli Avatar

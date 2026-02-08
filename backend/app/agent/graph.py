@@ -20,7 +20,7 @@ from langchain_core.messages import (
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import SYSTEM_PROMPT, build_system_prompt
 from app.agent.tools import build_tools
 from app.config import settings
 from app.memory.manager import MemoryManager
@@ -67,6 +67,7 @@ class AssistantAgent:
         session_id: str,
         *,
         history: list[BaseMessage] | None = None,
+        language: str = "en",
     ) -> str:
         """Send a message and return the full response (non-streaming).
 
@@ -78,11 +79,12 @@ class AssistantAgent:
             message: User's text message.
             session_id: Current session identifier.
             history: Optional prior messages for context.
+            language: Language code for response ('en' or 'ar'). Default 'en'.
 
         Returns:
             The assistant's text response.
         """
-        messages = self._build_messages(message, session_id, history)
+        messages = self._build_messages(message, session_id, history, language)
         config = {"configurable": {"thread_id": session_id}}
 
         result = await self._graph.ainvoke(
@@ -117,6 +119,7 @@ class AssistantAgent:
         session_id: str,
         *,
         history: list[BaseMessage] | None = None,
+        language: str = "en",
     ) -> AsyncIterator[str]:
         """Send a message and yield response tokens as they arrive.
 
@@ -134,11 +137,12 @@ class AssistantAgent:
             message: User's text message.
             session_id: Current session identifier.
             history: Optional prior messages for context.
+            language: Language code for response ('en' or 'ar'). Default 'en'.
 
         Yields:
             Chunks of the assistant's **final** response text.
         """
-        messages = self._build_messages(message, session_id, history)
+        messages = self._build_messages(message, session_id, history, language)
         config = {"configurable": {"thread_id": session_id}}
 
         final_response = ""
@@ -263,9 +267,19 @@ class AssistantAgent:
         user_text: str,
         session_id: str,
         history: list[BaseMessage] | None,
+        language: str = "en",
     ) -> list[BaseMessage]:
-        """Construct the message list including system prompt + history from MongoDB."""
-        system_text = SYSTEM_PROMPT.format(
+        """
+        Construct the message list including system prompt + history from MongoDB.
+
+        Args:
+            user_text: The user's message text
+            session_id: Session identifier for formatting
+            history: Previous conversation messages
+            language: Language code ('en' or 'ar') for bilingual system prompt
+        """
+        # Build dynamic system prompt based on detected language
+        system_text = build_system_prompt(language).format(
             current_time=datetime.now(timezone.utc).strftime(
                 "%A, %B %d, %Y at %I:%M %p UTC"
             ),

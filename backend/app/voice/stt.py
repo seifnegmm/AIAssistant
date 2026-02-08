@@ -48,31 +48,48 @@ class StreamingSTT:
             self._client = None
         logger.info("StreamingSTT closed")
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self, audio_bytes: bytes, language: str = "en", auto_detect: bool = False
+    ) -> tuple[str, str]:
         """Transcribe a complete audio chunk to text.
 
         Args:
             audio_bytes: Raw PCM16 audio (16kHz, mono, 16-bit signed LE).
+            language: Language code ('en' for English, 'ar' for Arabic).
+            auto_detect: If True, use multi-language detection (en-US, ar-SA).
 
         Returns:
-            Transcribed text string, or empty string if nothing recognized.
+            Tuple of (transcribed_text, detected_language_code).
+            Language code will be 'en' or 'ar' based on detection.
         """
         if not self._client:
             raise RuntimeError("StreamingSTT not initialized. Call initialize() first.")
 
         if not audio_bytes or len(audio_bytes) < 100:
-            return ""
+            return "", "en"
 
         audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
 
+        if auto_detect:
+            language_code = "en-US"
+            alternative_language_codes = ["ar-SA"]
+        else:
+            language_code = "ar-SA" if language == "ar" else "en-US"
+            alternative_language_codes = []
+
+        config = {
+            "encoding": "LINEAR16",
+            "sampleRateHertz": self._sample_rate,
+            "languageCode": language_code,
+            "model": "latest_long",
+            "enableAutomaticPunctuation": True,
+        }
+
+        if alternative_language_codes:
+            config["alternativeLanguageCodes"] = alternative_language_codes
+
         request_body = {
-            "config": {
-                "encoding": "LINEAR16",
-                "sampleRateHertz": self._sample_rate,
-                "languageCode": "en-US",
-                "model": "latest_long",
-                "enableAutomaticPunctuation": True,
-            },
+            "config": config,
             "audio": {
                 "content": audio_b64,
             },
@@ -90,14 +107,21 @@ class StreamingSTT:
             results = data.get("results", [])
             if not results:
                 logger.debug("STT returned no results")
-                return ""
+                return "", language
 
             transcript = results[0].get("alternatives", [{}])[0].get("transcript", "")
             confidence = results[0].get("alternatives", [{}])[0].get("confidence", 0)
+            detected_lang_code = results[0].get("languageCode", language_code)
+
+            detected_lang = "ar" if detected_lang_code.startswith("ar") else "en"
+
             logger.info(
-                "STT transcribed: '%s' (confidence=%.2f)", transcript[:80], confidence
+                "STT transcribed: '%s' (confidence=%.2f, language=%s)",
+                transcript[:80],
+                confidence,
+                detected_lang,
             )
-            return transcript
+            return transcript, detected_lang
 
         except httpx.HTTPStatusError as e:
             logger.error(
@@ -110,20 +134,20 @@ class StreamingSTT:
 
     async def stream_transcribe(
         self, audio_stream: AsyncIterator[bytes], chunk_duration_ms: int = 3000
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[tuple[str, str]]:
         """Process an audio stream in chunks and yield partial transcripts.
 
         Accumulates audio data and transcribes every `chunk_duration_ms` worth of audio.
-        This simulates streaming by doing repeated single-shot recognition.
+        This simulates streaming by doing repeated single-shot recognition with auto-detect.
 
         Args:
             audio_stream: Async iterator of raw PCM16 audio chunks.
             chunk_duration_ms: How often to transcribe (in milliseconds).
 
         Yields:
-            Partial transcript strings.
+            Tuples of (transcript, detected_language).
         """
-        bytes_per_ms = (self._sample_rate * 2) // 1000  # 16-bit = 2 bytes per sample
+        bytes_per_ms = (self._sample_rate * 2) // 1000
         chunk_size = bytes_per_ms * chunk_duration_ms
         buffer = bytearray()
 
@@ -131,13 +155,14 @@ class StreamingSTT:
             buffer.extend(chunk)
 
             if len(buffer) >= chunk_size:
-                transcript = await self.transcribe(bytes(buffer))
+                transcript, lang = await self.transcribe(
+                    bytes(buffer), auto_detect=True
+                )
                 buffer.clear()
                 if transcript:
-                    yield transcript
+                    yield transcript, lang
 
-        # Transcribe any remaining audio
         if len(buffer) > 100:
-            transcript = await self.transcribe(bytes(buffer))
+            transcript, lang = await self.transcribe(bytes(buffer), auto_detect=True)
             if transcript:
-                yield transcript
+                yield transcript, lang

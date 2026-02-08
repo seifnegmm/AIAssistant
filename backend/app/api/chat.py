@@ -13,6 +13,7 @@ from app.agent.graph import AssistantAgent
 from app.config import settings
 from app.dependencies import get_memory_manager
 from app.memory.preference_learner import PreferenceLearner
+from app.utils.language_detector import LanguageDetector
 from app.voice.stt import StreamingSTT
 from app.voice.tts import TextToSpeech
 
@@ -36,6 +37,7 @@ async def websocket_chat(websocket: WebSocket) -> None:
     await _send_message(websocket, "status", "Connected", session_id)
 
     memory_manager = get_memory_manager()
+    lang_detector = LanguageDetector()
 
     try:
         agent = AssistantAgent(memory_manager)
@@ -101,15 +103,20 @@ async def websocket_chat(websocket: WebSocket) -> None:
                 )
                 audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
                 await _handle_audio_message(
-                    websocket, agent, memory_manager, session_id, audio_b64
+                    websocket,
+                    agent,
+                    memory_manager,
+                    session_id,
+                    audio_b64,
+                    lang_detector,
                 )
             elif msg_type == "text" and content.strip():
                 await _handle_text_message(
-                    websocket, agent, memory_manager, session_id, content
+                    websocket, agent, memory_manager, session_id, content, lang_detector
                 )
             elif msg_type == "audio" and content:
                 await _handle_audio_message(
-                    websocket, agent, memory_manager, session_id, content
+                    websocket, agent, memory_manager, session_id, content, lang_detector
                 )
             else:
                 await _send_message(
@@ -132,22 +139,29 @@ async def _handle_text_message(
     memory_manager,
     session_id: str,
     content: str,
+    lang_detector: LanguageDetector,
 ) -> None:
     """Process a text message through the LangGraph agent with streaming."""
     await _send_message(websocket, "status", "Thinking...", session_id)
+
+    detected_language = lang_detector.detect(content, session_id)
 
     try:
         # Stream the agent response token-by-token.
         # The agent persists both user + AI messages to MongoDB after streaming.
         full_response = ""
-        async for token in agent.chat_stream(content, session_id):
+        async for token in agent.chat_stream(
+            content, session_id, language=detected_language
+        ):
             full_response += token
             await _send_message(websocket, "stream", token, session_id)
 
         # If no tokens were streamed, use non-streaming fallback.
         # The non-streaming path also persists to MongoDB internally.
         if not full_response:
-            full_response = await agent.chat(content, session_id)
+            full_response = await agent.chat(
+                content, session_id, language=detected_language
+            )
             await _send_message(websocket, "text", full_response, session_id)
         else:
             # Send final complete message
@@ -183,6 +197,7 @@ async def _handle_audio_message(
     memory_manager,
     session_id: str,
     audio_b64: str,
+    lang_detector: LanguageDetector,
 ) -> None:
     """Process audio: STT → Agent → TTS → send audio back."""
     await _send_message(websocket, "status", "Processing audio...", session_id)
@@ -196,7 +211,9 @@ async def _handle_audio_message(
     try:
         stt = StreamingSTT()
         await stt.initialize()
-        transcript = await stt.transcribe(audio_bytes)
+        transcript, detected_language = await stt.transcribe(
+            audio_bytes, auto_detect=True
+        )
 
         if not transcript.strip():
             await _send_message(
@@ -204,18 +221,19 @@ async def _handle_audio_message(
             )
             return
 
-        # Send the transcript to the client
         await _send_message(websocket, "transcript", transcript, session_id)
 
-        # Process through the agent (same as text flow).
-        # The agent persists both user + AI messages to MongoDB internally.
         full_response = ""
-        async for token in agent.chat_stream(transcript, session_id):
+        async for token in agent.chat_stream(
+            transcript, session_id, language=detected_language
+        ):
             full_response += token
             await _send_message(websocket, "stream", token, session_id)
 
         if not full_response:
-            full_response = await agent.chat(transcript, session_id)
+            full_response = await agent.chat(
+                transcript, session_id, language=detected_language
+            )
             await _send_message(websocket, "text", full_response, session_id)
         else:
             await _send_message(websocket, "text", full_response, session_id)
@@ -228,7 +246,7 @@ async def _handle_audio_message(
         # Synthesize speech and send audio back as base64 PCM16
         tts = TextToSpeech()
         await tts.initialize()
-        pcm_audio = await tts.synthesize(full_response)
+        pcm_audio = await tts.synthesize(full_response, language=detected_language)
 
         if pcm_audio:
             audio_response_b64 = base64.b64encode(pcm_audio).decode("ascii")

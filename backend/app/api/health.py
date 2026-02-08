@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from motor.motor_asyncio import AsyncIOMotorDatabase
 import chromadb
 
 from app.config import Settings, get_settings

@@ -7,19 +7,31 @@ from app.personality.loader import load_personality
 logger = logging.getLogger(__name__)
 
 
-def build_system_prompt() -> str:
-    """Build the full system prompt by merging personality config with memory guidelines."""
+def build_system_prompt(language: str = "en") -> str:
+    """Build the full system prompt by merging personality config with memory guidelines.
+
+    Args:
+        language: Target language ('en' or 'ar') for greeting customization
+    """
     personality = load_personality()
     persona_block = personality.get("system_prompt", "").strip()
     name = personality.get("name", "Atlas")
-    greeting = personality.get("greeting", "")
+
+    # Support both old string format and new dict format for greetings
+    greeting_config = personality.get("greeting", "")
+    if isinstance(greeting_config, dict):
+        greeting = greeting_config.get(language, greeting_config.get("en", "Hello!"))
+    else:
+        greeting = greeting_config
+
+    greeting_instruction = (f'When starting a new conversation, greet the user with: "{greeting}"')
 
     return f"""You are {name}.
 
 {persona_block}
 
 ## Greeting
-When starting a new conversation, greet the user with: "{greeting}"
+{greeting_instruction}
 
 ## Memory Guidelines
 - Use `recall_memory` at the start of conversations to check for relevant context
