@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 99 102 241;
+    --color-secondary: 139 92 246;
+    --color-accent: 236 72 153;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(55 65 81) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgb(55 65 81);
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  .chat-bubble-user {
+    @apply rounded-2xl rounded-br-md bg-indigo-600 px-4 py-2.5 text-white;
+  }
+
+  .chat-bubble-assistant {
+    @apply rounded-2xl rounded-bl-md bg-gray-800 px-4 py-2.5 text-gray-100;
+  }
+
+  .btn-primary {
+    @apply rounded-xl bg-indigo-600 px-4 py-2 font-medium text-white transition-colors
+           hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+           focus:ring-offset-gray-950 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-icon {
+    @apply rounded-full p-2.5 transition-colors hover:bg-gray-800
+           focus:outline-none focus:ring-2 focus:ring-indigo-500;
+  }
+}

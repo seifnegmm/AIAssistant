@@ -1,0 +1,11 @@
+**/.git
+**/.DS_Store
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/node_modules
+**/.next
+**/.venv
+**/*.pyc
+*.md
+.env.local
