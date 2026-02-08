@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 
 from langchain_core.tools import tool
 from tavily import TavilyClient
+from telegram import Bot
+from telegram.error import TelegramError
 
 from app.config import settings
 
@@ -37,6 +39,14 @@ def build_tools(memory_manager: MemoryManager) -> list:
         tools.append(web_search)
     else:
         logger.warning("TAVILY_API_KEY not set - web search tool disabled")
+
+    # Add Telegram messaging tool only if bot token is configured
+    if settings.telegram_bot_token and settings.telegram_user_id:
+        tools.append(send_telegram_message)
+    else:
+        logger.warning(
+            "TELEGRAM_BOT_TOKEN or TELEGRAM_USER_ID not set - Telegram messaging disabled"
+        )
 
     return tools
 
@@ -290,3 +300,62 @@ def web_search(query: str) -> str:
     except Exception as e:
         logger.exception("web_search failed for query: %s", query)
         return f"Web search encountered an error: {str(e)}"
+
+
+@tool
+def send_telegram_message(message: str) -> str:
+    """Send a message to the user on Telegram.
+
+    Use this tool when the user explicitly asks you to:
+    - Send them a reminder or notification
+    - Text them about something later
+    - Message them when a condition is met
+    - Alert them proactively
+
+    Examples of when to use this:
+    - "Text me in 30 minutes to check on the laundry"
+    - "Send me a Telegram message when you find the answer"
+    - "Remind me tomorrow about the meeting"
+    - "Let me know on Telegram if there's breaking news about X"
+
+    DO NOT use this for:
+    - Regular conversation responses (those go to the current chat interface)
+    - Just because Telegram is mentioned in passing
+    - Repeating information already displayed in the chat
+
+    Args:
+        message: The text message to send. Keep it concise and clear.
+                Should be in the same language as the user's request.
+
+    Returns:
+        Confirmation that the message was sent or an error message.
+    """
+    if not settings.telegram_bot_token or not settings.telegram_user_id:
+        return "Telegram messaging is not configured. Please set TELEGRAM_BOT_TOKEN and TELEGRAM_USER_ID in your environment."
+
+    try:
+        # Create bot instance
+        bot = Bot(token=settings.telegram_bot_token)
+
+        # Send message asynchronously (run_async handles the event loop)
+        response = _run_async(
+            bot.send_message(
+                chat_id=settings.telegram_user_id,
+                text=message,
+                parse_mode=None,  # Send as plain text to avoid markdown parsing issues
+            )
+        )
+
+        logger.info(
+            "Telegram message sent successfully to user %s (message_id: %s)",
+            settings.telegram_user_id,
+            response.message_id,
+        )
+        return f"✓ Message sent to you on Telegram successfully."
+
+    except TelegramError as e:
+        logger.exception("Telegram API error")
+        return f"Failed to send Telegram message: {str(e)}"
+    except Exception as e:
+        logger.exception("send_telegram_message failed")
+        return f"Unexpected error sending Telegram message: {str(e)}"

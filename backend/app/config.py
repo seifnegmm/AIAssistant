@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Web Search
     tavily_api_key: str = ""
 
+    # Telegram Bot
+    telegram_bot_token: str = ""
+    telegram_user_id: str = ""
+
     # MongoDB
     mongodb_uri: str = "mongodb://mongodb:27017"
     mongodb_database: str = "ai_assistant"
