@@ -16,7 +16,7 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(backend_dir))
 
-from app.dependencies import get_memory_manager
+from app.dependencies import get_memory_manager, get_scheduler
 from app.telegram.bot import get_bot
 
 # Configure logging
@@ -39,6 +39,7 @@ async def main():
     logger.info("=" * 50)
 
     memory_manager = None
+    scheduler = None
     try:
         # Initialize memory manager
         logger.info("Initializing memory manager...")
@@ -46,17 +47,27 @@ async def main():
         await memory_manager.initialize()
         logger.info("Memory manager initialized successfully")
 
+        # Initialize scheduler
+        logger.info("Initializing scheduler...")
+        scheduler = get_scheduler()
+        await scheduler.initialize()
+        logger.info("Scheduler initialized successfully")
+
         # Start bot
         bot = get_bot()
         await bot.start_polling()
     except KeyboardInterrupt:
         logger.info("Received interrupt signal. Shutting down...")
         # Cleanup
+        if scheduler:
+            await scheduler.shutdown()
         if memory_manager:
             await memory_manager.close()
         logger.info("Bot shut down cleanly")
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
+        if scheduler:
+            await scheduler.shutdown()
         if memory_manager:
             await memory_manager.close()
         sys.exit(1)

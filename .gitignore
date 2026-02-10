@@ -1,6 +1,9 @@
-.env*
+.env
+.env.*
+!.env.example
 node_modules
 .npm
 .next
 .cache
 __pycache__
+.DS_STORE

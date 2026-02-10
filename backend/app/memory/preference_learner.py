@@ -6,7 +6,6 @@ in ChromaDB's user_preferences collection via MemoryManager.
 
 import json
 import logging
-from datetime import datetime, timezone
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -83,9 +82,7 @@ class PreferenceLearner:
         if not messages:
             return []
 
-        conversation_text = "\n".join(
-            f"{m['role'].upper()}: {m['content']}" for m in messages
-        )
+        conversation_text = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
 
         try:
             response = await self.model.ainvoke(
@@ -124,9 +121,7 @@ class PreferenceLearner:
                     source="inferred",
                 )
                 stored.append(pref)
-                logger.info(
-                    "Learned preference: %s = %s (%.1f)", key, value, confidence
-                )
+                logger.info("Learned preference: %s = %s (%.1f)", key, value, confidence)
 
             return stored
 

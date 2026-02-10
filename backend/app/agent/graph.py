@@ -57,10 +57,6 @@ class AssistantAgent:
             len(self._tools),
         )
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     async def chat(
         self,
         message: str,
@@ -87,10 +83,7 @@ class AssistantAgent:
         messages = self._build_messages(message, session_id, history, language)
         config = {"configurable": {"thread_id": session_id}}
 
-        result = await self._graph.ainvoke(
-            {"messages": messages},
-            config=config,
-        )
+        result = await self._graph.ainvoke({"messages": messages},config=config)
 
         # Extract the agent's new messages (everything after our input)
         all_result_msgs: list[BaseMessage] = result["messages"]
@@ -153,9 +146,6 @@ class AssistantAgent:
         pending_tool_calls: dict[str, dict] = {}
         # All resolved tool calls across the entire turn (preserves order).
         resolved_tool_calls: list[dict] = []
-        # True while the current LLM invocation is an intermediate step
-        # (i.e. the model is deciding which tool to call, NOT answering the user).
-        _is_intermediate_step = False
         # Track whether we've seen a tool_call_chunk in the current LLM stream.
         _saw_tool_call_in_current_stream = False
 
@@ -258,10 +248,6 @@ class AssistantAgent:
             ]
         )
 
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
-
     def _build_messages(
         self,
         user_text: str,
@@ -280,9 +266,7 @@ class AssistantAgent:
         """
         # Build dynamic system prompt based on detected language
         system_text = build_system_prompt(language).format(
-            current_time=datetime.now(timezone.utc).strftime(
-                "%A, %B %d, %Y at %I:%M %p UTC"
-            ),
+            current_time=datetime.now(timezone.utc).strftime("%A, %B %d, %Y at %I:%M %p UTC"),
             session_id=session_id,
         )
 
@@ -306,8 +290,6 @@ class AssistantAgent:
     def system_prompt(self) -> str:
         """Return the formatted system prompt (for debugging)."""
         return SYSTEM_PROMPT.format(
-            current_time=datetime.now(timezone.utc).strftime(
-                "%A, %B %d, %Y at %I:%M %p UTC"
-            ),
+            current_time=datetime.now(timezone.utc).strftime("%A, %B %d, %Y at %I:%M %p UTC"),
             session_id="debug",
         )
