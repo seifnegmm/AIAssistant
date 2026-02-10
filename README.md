@@ -18,7 +18,6 @@ A production-ready, cloud-based AI assistant with speech recognition, text-to-sp
 - **🧠 Intelligent Memory**: Long-term memory with preference learning and context retention
 - **🔍 Web Search**: Real-time information retrieval via Tavily AI integration
 - **📱 Telegram Bot**: Two-way chat with voice message support and proactive messaging
-- **🎵 Spotify Integration**: Play music on your devices through natural language commands
 - **⏰ Smart Scheduling**: Schedule Telegram reminders using natural language time expressions
 
 ### Technical Highlights
